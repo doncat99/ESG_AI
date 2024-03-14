@@ -15,7 +15,7 @@ import sys
 import metadata_parser
 
 ####### CACHED FUNCTIONS ######
-@st.cache(show_spinner=False, suppress_st_warning=True)
+@st.cache_data()
 def filter_company_data(df_company, esg_categories, start, end):
     #Filter E,S,G Categories
     comps = []
@@ -29,8 +29,7 @@ def filter_company_data(df_company, esg_categories, start, end):
     return df_company
 
 
-@st.cache(show_spinner=False, suppress_st_warning=True,
-          allow_output_mutation=True)
+@st.cache_data()
 def load_data(start_data, end_data):
     data = Data().read(start_data, end_data)
     companies = data["data"].Organization.sort_values().unique().tolist()
@@ -38,7 +37,7 @@ def load_data(start_data, end_data):
     return data, companies
 
 
-@st.cache(show_spinner=False,suppress_st_warning=True)
+@st.cache_data()
 def filter_publisher(df_company,publisher):
     if publisher != 'all':
         df_company = df_company[df_company['SourceCommonName'] == publisher]
@@ -59,8 +58,10 @@ def get_melted_frame(data_dict, frame_names, keepcol=None, dropcol=None):
 
 
 def filter_on_date(df, start, end, date_col="DATE"):
-    df = df[(df[date_col] >= pd.to_datetime(start)) &
-            (df[date_col] <= pd.to_datetime(end))]
+    # df = df[(df[date_col] >= pd.Timestamp(start)) &
+    #         (df[date_col] <= pd.Timestamp(end))]
+    df[date_col] = pd.to_datetime(df[date_col]).dt.date
+    df = df[df[date_col].between(start, end)]
     return df
 
 
@@ -84,7 +85,7 @@ def main(start_data, end_data):
     icon_path = os.path.join(".", "raw", "esg_ai_logo.png")
     st.set_page_config(page_title="ESG AI", page_icon=icon_path,
                        layout='centered', initial_sidebar_state="collapsed")
-    _, logo, _ = st.beta_columns(3)
+    _, logo, _ = st.columns(3)
     logo.image(icon_path, width=200)
     style = ("text-align:center; padding: 0px; font-family: arial black;, "
              "font-size: 400%")
@@ -153,7 +154,7 @@ def main(start_data, end_data):
 
 
         ###### DISPLAY DATA ######
-        URL_Expander = st.beta_expander(f"View {company.title()} Data:", True)
+        URL_Expander = st.expander(f"View {company.title()} Data:", True)
         URL_Expander.write(f"### {len(df_company):,d} Matching Articles for " +
                            company.title())
         display_cols = ["DATE", "SourceCommonName", "Tone", "Polarity",
@@ -172,7 +173,7 @@ def main(start_data, end_data):
 
         ###### CHART: METRIC OVER TIME ######
         st.markdown("---")
-        col1, col2 = st.beta_columns((1, 3))
+        col1, col2 = st.columns((1, 3))
 
         metric_options = ["Tone", "NegativeTone", "PositiveTone", "Polarity",
                           "ActivityDensity", "WordCount", "Overall Score",
@@ -235,12 +236,14 @@ def main(start_data, end_data):
 
 
         ###### CHART: ESG RADAR ######
-        col1, col2 = st.beta_columns((1, 2))
+        col1, col2 = st.columns((1, 2))
         avg_esg = data["ESG"]
         avg_esg.rename(columns={"Unnamed: 0": "Type"}, inplace=True)
         avg_esg.replace({"T": "Overall", "E": "Environment",
                          "S": "Social", "G": "Governance"}, inplace=True)
-        avg_esg["Industry Average"] = avg_esg.mean(axis=1)
+
+        # include=['int64', 'float64']
+        avg_esg["Industry Average"] = avg_esg.select_dtypes(exclude=['object']).mean(axis=1)
 
         radar_df = avg_esg[["Type", company, "Industry Average"]].melt("Type",
             value_name="score", var_name="entity")

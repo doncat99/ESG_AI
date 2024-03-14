@@ -314,6 +314,8 @@ def main(start_data, end_data):
         ###### NUMBER OF NEIGHBORS TO FIND #####
         neighbor_cols = [f"n{i}_rec" for i in range(num_neighbors)]
         company_df = df_conn[df_conn.company == company]
+        if company_df.empty:
+            company_df.loc[len(company_df)] = 0
         neighbors = company_df[neighbor_cols].iloc[0]
 
 
